@@ -5,10 +5,10 @@
 ```bash
 $ mediawiki-extension-downloader --config ./config.json --target ./extension --force-rm-target=true
 ```
-See `config.json` to how to configure
+See `config.json.example` to how to configure
 
 # Docker
-[`ghcr.io/ShinyWiki/mediawiki-extension-downloader`](https://ghcr.io/ShinyWiki/mediawiki-extension-downloader)
+[`ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader`](https://ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader)
 
 # Limits/Known Issues
 * WMF extensions are downloaded using github. Will use Their GitLab once migrated all.
