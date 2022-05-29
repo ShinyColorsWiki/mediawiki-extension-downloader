@@ -17,7 +17,7 @@ import (
 
 // Root of config
 type RootConfig struct {
-	MWREL      string     `json:"MWREL"`
+	MWREL      string     `json:"MWREL,omitempty"`
 	Extensions TypeConfig `json:"Extensions"`
 	Skins      TypeConfig `json:"Skins"`
 }
