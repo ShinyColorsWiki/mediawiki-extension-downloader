@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	netUrl "net/url"
 	"os"
@@ -14,6 +15,36 @@ import (
 	"github.com/mholt/archiver/v3"
 )
 
+// Root of config
+type RootConfig struct {
+	MWREL      string     `json:"MWREL"`
+	Extensions TypeConfig `json:"Extensions"`
+	Skins      TypeConfig `json:"Skins"`
+}
+
+// The download types
+type TypeConfig struct {
+	WMF  []string             `json:"WMF,omitempty"`
+	Git  map[string]GitConfig `json:"Git,omitempty"`
+	Http map[string]string    `json:"http,omitempty"`
+}
+
+// Git Type Config
+type GitConfig struct {
+	Type    string `json:"type"`
+	Repo    string `json:"repo,omitempty"`
+	Branch  string `json:"branch,omitempty"`
+	RepoUrl string `json:"repoUrl,omitempty"`
+}
+
+// Parsed download option.
+type DownloadOption struct {
+	Type string
+	Name string
+	Url  string
+}
+
+// Parse config to struct.
 func readConfig(config_path string) (*RootConfig, error) {
 	jsonFile, err := os.Open(config_path)
 	fatalLog("Failed to read config.", err)
@@ -29,6 +60,88 @@ func readConfig(config_path string) (*RootConfig, error) {
 	return &result, nil
 }
 
+// Just make new DownloadOption
+func NewDownloadOptions(t string, name string, url string) DownloadOption {
+	return DownloadOption{Type: t, Name: name, Url: url}
+}
+
+// Parse config to make download options.
+func parseConfigToUrls(config RootConfig) []DownloadOption {
+	var result []DownloadOption
+	a := func(t DownloadOption) {
+		result = append(result, t)
+	}
+
+	u := func(url string) string {
+		return strings.ReplaceAll(url, "$mwrel", MWREL)
+	}
+
+	for _, name := range config.Extensions.WMF {
+		a(NewDownloadOptions("extensions", name, WMFExtensionUrl(name)))
+		log.Debugf("Added WMF Extension \"%s\" to download queue.", name)
+	}
+
+	for name, git := range config.Extensions.Git {
+		a(NewDownloadOptions("extensions", name, git.MakeGitUrl()))
+		log.Debugf("Added Git Extension \"%s\" to download queue.", name)
+	}
+
+	for name, url := range config.Extensions.Http {
+		a(NewDownloadOptions("extensions", name, u(url)))
+		log.Debugf("Added Url Extension \"%s\" to download queue.", name)
+	}
+
+	for _, name := range config.Skins.WMF {
+		a(NewDownloadOptions("skins", name, WMFSkinUrl(name)))
+		log.Debugf("Added WMF Skin \"%s\" to download queue.", name)
+	}
+
+	for name, git := range config.Skins.Git {
+		a(NewDownloadOptions("skins", name, git.MakeGitUrl()))
+		log.Debugf("Added Git Skin \"%s\" to download queue.", name)
+	}
+
+	for name, url := range config.Skins.Http {
+		a(NewDownloadOptions("skins", name, u(url)))
+		log.Debugf("Added Url Skin \"%s\" to download queue.", name)
+	}
+
+	return result
+}
+
+// Make Git Url from GitConfig
+func (s GitConfig) MakeGitUrl() string {
+	// TODO: Direct Git Download for not-defacto git sites like self-hosted git solutions.
+	// No direct git download when using url builder.
+
+	// Choose default branch
+	if s.Branch == "" {
+		s.Branch = MWREL
+	}
+
+	switch s.Type {
+	case "github":
+		return fmt.Sprintf("https://github.com/%s/archive/%s.tar.gz", s.Repo, s.Branch)
+	case "gitlab":
+		return fmt.Sprintf("https://gitlab.com/%s/-/archive/%s.tar.gz", s.Repo, s.Branch) // TODO: Is this really works well?
+	default:
+		return ""
+	}
+}
+
+// Make WMF Extension Download Url.
+func WMFExtensionUrl(name string) string {
+	// FIXME: Use gerrit. or gitlab when they moved.
+	return fmt.Sprintf("https://github.com/wikimedia/mediawiki-extensions-%s/archive/%s.tar.gz", name, MWREL)
+}
+
+// Make WMF Skin Download Url.
+func WMFSkinUrl(name string) string {
+	// FIXME: Use gerrit. or gitlab when they moved.
+	return fmt.Sprintf("https://github.com/wikimedia/mediawiki-skins-%s/archive/%s.tar.gz", name, MWREL)
+}
+
+// Handle Download
 func downloadUrl(name string, url string) (string, error) {
 	l := log.Child("downloadUrl").Child(name)
 	l.Debugf("Start download url \"%s\"", url)
@@ -59,6 +172,7 @@ func downloadUrl(name string, url string) (string, error) {
 	return filename, nil
 }
 
+// Try to detect extension for extract.
 func tryDetectExt(url string) string {
 	u, err := netUrl.Parse(url)
 	if err != nil {
@@ -75,10 +189,11 @@ func tryDetectExt(url string) string {
 	return ext
 }
 
-func unArchive(name string, filename string) error {
+// UnArchive using archiver.
+func unArchive(name string, filename string) (string, error) {
 	l := log.Child("unArchive").Child(name)
 
-	target := fmt.Sprintf("%s/%s", targetDir, name)
+	target := fmt.Sprintf("%s/%s-%d", tempDir, name, rand.Int())
 
 	ext := tryDetectExt(filename)
 	l.Debugf("Detected extension: %s", ext)
@@ -93,12 +208,12 @@ func unArchive(name string, filename string) error {
 			OverwriteExisting: true,
 			MkdirAll:          true,
 		}
-		return a.Unarchive(filename, target)
+		return target, a.Unarchive(filename, target)
 	case ".tar": // .tar.gz or .tar.xz...
 		n := fmt.Sprintf("%s/%s.tar", tempDir, name)
 		err := DecompressFileWrapper(filename, n)
 		if err != nil {
-			return err
+			return "", err
 		}
 
 		a := archiver.Tar{
@@ -106,28 +221,29 @@ func unArchive(name string, filename string) error {
 			OverwriteExisting: true,
 			MkdirAll:          true,
 		}
-		return a.Unarchive(n, target)
+		return target, a.Unarchive(n, target)
 	case ".zip":
 		a := archiver.Zip{
 			StripComponents:   1,
 			OverwriteExisting: true,
 			MkdirAll:          true,
 		}
-		return a.Unarchive(filename, target)
+		return target, a.Unarchive(filename, target)
 	case ".rar":
 		a := archiver.Rar{
 			StripComponents:   1,
 			OverwriteExisting: true,
 			MkdirAll:          true,
 		}
-		return a.Unarchive(filename, target)
+		return target, a.Unarchive(filename, target)
 	default:
-		return archiver.Unarchive(filename, target)
+		return target, archiver.Unarchive(filename, target)
 	}
 }
 
+// archiver.DecompressFile has a bug that tar compressed doesn't recognized well... Fix in place.
 func DecompressFileWrapper(source, destination string) error {
-	// archiver.DecompressFile has a bug that tar compressed doesn't recognized well... Fix in place.
+	// this line is fix.
 	cIface, err := archiver.ByExtension(strings.Replace(source, ".tar.", ".", 1))
 	if err != nil {
 		return err
@@ -139,6 +255,7 @@ func DecompressFileWrapper(source, destination string) error {
 	return archiver.FileCompressor{Decompressor: c}.DecompressFile(source, destination)
 }
 
+// Get Environment value with fallback
 func getEnv(key, fallback string) string {
 	value, exists := os.LookupEnv(key)
 	if !exists {

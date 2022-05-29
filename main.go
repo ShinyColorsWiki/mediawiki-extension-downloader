@@ -11,26 +11,12 @@ import (
 	"github.com/kataras/golog"
 )
 
-type RootConfig struct {
-	MWREL string                  `json:"MWREL"`
-	WMF   []string                `json:"WMF,omitempty"`
-	Git   map[string]GitExtConfig `json:"Git,omitempty"`
-	Http  map[string]string       `json:"http,omitempty"`
-}
-
-type GitExtConfig struct {
-	Type    string `json:"type"`
-	Repo    string `json:"repo,omitempty"`
-	Branch  string `json:"branch,omitempty"`
-	RepoUrl string `json:"repoUrl,omitempty"`
-}
-
 var log = golog.New()
 
 var MWREL string = "master" // this does for default branch name too.
 var targetDir string
 var tempDir string
-var hasError = false
+var hasError = false // check has error during download
 
 func fatalLog(msg string, err error) {
 	if err != nil {
@@ -40,112 +26,104 @@ func fatalLog(msg string, err error) {
 }
 
 func main() {
+	// Set log level from environment
 	log.SetLevel(getEnv("LOG_LEVEL", "info"))
 
-	config_path := flag.String("config", "./config.json", "A config file for download extensions.")
-	target_path := flag.String("target", "./dowloaded-extension", "A target folder for downloaded extensions.")
+	// Defined and parse flags
+	config_path := flag.String("config", "./config.json", "A config file for download extensions and skins.")
+	target_path := flag.String("target", "./downloaded", "A target folder for downloaded extensions and skins.")
 	force_rm_target := flag.Bool("force-rm-target", false, "Turn this on to delete target directory if exist. Be careful to use!")
 	flag.Parse()
 
+	// Set flags to each variables.
 	config, err := readConfig(*config_path)
 	fatalLog("Error during read config.", err)
 
 	targetDir, err = filepath.Abs(*target_path)
 	fatalLog("Failed to convert target path to absoluete path.", err)
 
+	// Set MWREL for download.
 	MWREL = getEnv("MWREL", config.MWREL)
 	if MWREL == "" {
 		MWREL = "master" // fallback to master.
 	}
 
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+	// Make Target Directories.
+	mkTargetDir := func() {
 		err = os.MkdirAll(targetDir, os.ModePerm)
 		fatalLog("Failed to create target path directory", err)
+		err = os.MkdirAll(targetDir+"/extensions", os.ModePerm)
+		fatalLog("Failed to create extension directory inside of target path directory", err)
+		err = os.MkdirAll(targetDir+"/skins", os.ModePerm)
+		fatalLog("Failed to create skin directory inside of target path directory", err)
+	}
+
+	// Check Target Directory exists. if not, make directories and also check flag for old directory deletion.
+	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+		mkTargetDir()
 	} else if !*force_rm_target {
 		msg := "Target folder already exist. Please remove your self or set '--force-rm-target=true'"
 		fatalLog(msg, errors.New(msg))
 	} else {
 		err := os.RemoveAll(targetDir)
-		fatalLog("Failed to create target path directory", err)
-		err = os.MkdirAll(targetDir, os.ModePerm)
-		fatalLog("Failed to create target path directory", err)
+		fatalLog("Failed to clean up target path directory", err)
+		mkTargetDir()
 	}
 
+	// Make temporal directory for download and extract.
 	tempDir, err = os.MkdirTemp("", "mediawiki-extension-downloader-")
 	fatalLog("Failed to generate temporal directory.", err)
 
 	log.Info("Starting downloader...")
 
+	// Downloader.
 	var wg sync.WaitGroup
-	wg.Add(len(config.WMF))
-	for _, wmf_ext := range config.WMF {
-		log.Debugf("Starting WMF Extension Downloader for \"%s\"", wmf_ext)
-		go WMFDownloader(wmf_ext, &wg)
+	DownloadTargets := parseConfigToUrls(*config)
+	wg.Add(len(DownloadTargets))
+	for _, opts := range DownloadTargets {
+		log.Debugf("Start download %s \"%s\"", opts.Type, opts.Name)
+		go opts.StartDownload(&wg)
 	}
-
-	wg.Add(len(config.Git))
-	for name, git := range config.Git {
-		log.Debugf("Starting Git Downloader for \"%s\"", name)
-		go git.GitExtDownloader(name, &wg)
-	}
-
-	wg.Add(len(config.Http))
-	for name, url := range config.Http {
-		log.Debugf("Starting Url Downloader for \"%s\" (\"%s\")", name, url)
-		go HttpDownloader(name, url, &wg)
-	}
-
 	wg.Wait()
 
 	log.Debug("Cleanup temp directory...")
-
 	os.RemoveAll(tempDir)
 	fatalLog("Failed to delete temporal folder", err)
 
+	// Finish notify
+	if hasError {
+		log.Info("Error has occured during download. Please check the logs.")
+	}
 	log.Info("Download Finished.")
 }
 
-func (s GitExtConfig) GitExtDownloader(name string, wg *sync.WaitGroup) {
-	// TODO: Direct Git Download for not-defacto git sites like self-hosted git solutions.
-	// No direct git download when using url builder.
-	buildUrl := func() string {
-		// Choose default branch
-		if s.Branch == "" {
-			s.Branch = MWREL
-		}
-
-		switch s.Type {
-		case "github":
-			return fmt.Sprintf("https://github.com/%s/archive/%s.tar.gz", s.Repo, s.Branch)
-		case "gitlab":
-			return fmt.Sprintf("https://gitlab.com/%s/-/archive/%s.tar.gz", s.Repo, s.Branch) // TODO: Is this really works well?
-		default:
-			return ""
-		}
-	}
-
-	HttpDownloader(name, buildUrl(), wg)
-}
-
-func WMFDownloader(name string, wg *sync.WaitGroup) {
-	// FIXME: Use gerrit. or gitlab when they moved.
-	url := fmt.Sprintf("https://github.com/wikimedia/mediawiki-extensions-%s/archive/%s.tar.gz", name, MWREL)
-	HttpDownloader(name, url, wg)
-}
-
-func HttpDownloader(name string, url string, wg *sync.WaitGroup) {
+func (o DownloadOption) StartDownload(wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	filename, err := downloadUrl(name, url)
+	// remove "s" suffix
+	target_name := o.Type[:len(o.Type)-1]
+
+	// Download file from url.
+	filename, err := downloadUrl(o.Name, o.Url)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to download extension \"%s\" ", name)
+		msg := fmt.Sprintf("Failed to download %s \"%s\" ", target_name, o.Name)
 		log.Error(msg, err)
 		hasError = true
 	}
 
-	err = unArchive(name, filename)
+	// Extract to temp directory.
+	dirpath, err := unArchive(o.Name, filename)
 	if err != nil {
-		msg := fmt.Sprintf("Failed to extract extension \"%s\" ", name)
+		msg := fmt.Sprintf("Failed to extract %s \"%s\" to \"%s\" ", target_name, o.Name, dirpath)
+		log.Error(msg, err)
+		hasError = true
+	}
+
+	// And move to target.
+	dest := fmt.Sprintf("%s/%s/%s", targetDir, o.Type, o.Name)
+	err = os.Rename(dirpath, dest)
+	if err != nil {
+		msg := fmt.Sprintf("Failed to move %s \"%s\" from \"%s\" to \"%s\"", target_name, o.Name, dirpath, dest)
 		log.Error(msg, err)
 		hasError = true
 	}

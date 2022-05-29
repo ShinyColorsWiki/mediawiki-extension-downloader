@@ -3,8 +3,8 @@ RUN mkdir /app
 ADD . /app/
 WORKDIR /app
 RUN go get -d -v ./...
-RUN  CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o ./main ./...
+RUN  CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o ./app ./...
 
 FROM gcr.io/distroless/base
-COPY --from=builder /app/main .
-ENTRYPOINT ["./main"]
+COPY --from=builder /app/app .
+ENTRYPOINT ["./app"]
