@@ -53,6 +53,11 @@ func main() {
 	targetDir, err = filepath.Abs(*target_path)
 	fatalLog("Failed to convert target path to absoluete path.", err)
 
+	MWREL = getEnv("MWREL", config.MWREL)
+	if MWREL == "" {
+		MWREL = "master" // fallback to master.
+	}
+
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
 		err = os.MkdirAll(targetDir, os.ModePerm)
 		fatalLog("Failed to create target path directory", err)

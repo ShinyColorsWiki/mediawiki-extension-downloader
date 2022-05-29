@@ -5,7 +5,8 @@
 ```bash
 $ mediawiki-extension-downloader --config ./config.json --target ./extension --force-rm-target=true
 ```
-See `config.json.example` to how to configure
+See `config.json.example` to how to configure. \
+Note: Environment variable `MWREL` has high priority than config's `MWREL` settings.
 
 # Docker
 [`ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader`](https://ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader)
