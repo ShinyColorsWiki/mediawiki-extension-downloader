@@ -263,3 +263,11 @@ func getEnv(key, fallback string) string {
 	}
 	return value
 }
+
+// Check is Directory not exist.
+func isDirNotExist(p string) bool {
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return true
+	}
+	return false
+}

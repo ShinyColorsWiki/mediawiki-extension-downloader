@@ -52,22 +52,32 @@ func main() {
 	mkTargetDir := func() {
 		err = os.MkdirAll(targetDir, os.ModePerm)
 		fatalLog("Failed to create target path directory", err)
-		err = os.MkdirAll(targetDir+"/extensions", os.ModePerm)
-		fatalLog("Failed to create extension directory inside of target path directory", err)
-		err = os.MkdirAll(targetDir+"/skins", os.ModePerm)
-		fatalLog("Failed to create skin directory inside of target path directory", err)
 	}
 
-	// Check Target Directory exists. if not, make directories and also check flag for old directory deletion.
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
+	mkExtSkinDir := func() {
+		err = os.MkdirAll(targetDir+"/extensions", os.ModePerm)
+		fatalLog("Failed to create extensions directory inside of target path directory", err)
+		err = os.MkdirAll(targetDir+"/skins", os.ModePerm)
+		fatalLog("Failed to create skins directory inside of target path directory", err)
+	}
+
+	// Check Target Directory exists. if not, make directory.
+	if isDirNotExist(targetDir) {
 		mkTargetDir()
+	}
+
+	// Check extensions and skins directory exists. if not make one, if it is check flag for deletion
+	if isDirNotExist(targetDir+"/extensions") || isDirNotExist(targetDir+"/skins") {
+		mkExtSkinDir()
 	} else if !*force_rm_target {
 		msg := "Target folder already exist. Please remove your self or set '--force-rm-target=true'"
 		fatalLog(msg, errors.New(msg))
 	} else {
-		err := os.RemoveAll(targetDir)
-		fatalLog("Failed to clean up target path directory", err)
-		mkTargetDir()
+		err = os.RemoveAll(targetDir + "/extensions")
+		fatalLog("Failed to clean up target/extensions path directory", err)
+		err = os.RemoveAll(targetDir + "/skins")
+		fatalLog("Failed to clean up target/skins path directory", err)
+		mkExtSkinDir()
 	}
 
 	// Make temporal directory for download and extract.
