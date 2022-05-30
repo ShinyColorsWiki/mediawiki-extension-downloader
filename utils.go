@@ -127,14 +127,49 @@ func (s GitConfig) MakeGitUrl() string {
 
 // Make WMF Extension Download Url.
 func WMFExtensionUrl(name string) string {
-	// FIXME: Use gerrit. or gitlab when they moved.
-	return fmt.Sprintf("https://github.com/wikimedia/mediawiki-extensions-%s/archive/%s.tar.gz", name, MWREL)
+	return requestWMFExtDistUrl("extension", name)
 }
 
 // Make WMF Skin Download Url.
 func WMFSkinUrl(name string) string {
-	// FIXME: Use gerrit. or gitlab when they moved.
-	return fmt.Sprintf("https://github.com/wikimedia/mediawiki-skins-%s/archive/%s.tar.gz", name, MWREL)
+	return requestWMFExtDistUrl("skin", name)
+}
+
+type GerritBranchResponse struct {
+	// Much more but only needed.
+	Revision string `json:"revision"`
+}
+
+// TODO: async-able.
+func requestWMFExtDistUrl(t string, name string) string {
+	errHandler := func(msg string, err error) string {
+		log.Child("requestWMFExtDistUrl").Child(name).Error(msg, err)
+		hasError = true
+		return fmt.Sprintf("https://github.com/wikimedia/mediawiki-%ss-%s/archive/%s.tar.gz", t, name, MWREL)
+	}
+
+	// FIXME: Use gitlab when they moved.
+	branchInfoUrl := fmt.Sprintf("https://gerrit.wikimedia.org/r/projects/mediawiki%%2F%ss%%2F%s/branches/%s", t, name, MWREL)
+	resp, err := http.Get(branchInfoUrl)
+	if err != nil {
+		return errHandler("WMF Extension distributor infomation request failed. ", err)
+	}
+
+	defer resp.Body.Close()
+
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return errHandler("WMF Extension distributor infomation response read failed. ", err)
+	}
+
+	bytes = bytes[5 : len(bytes)-1]
+	var branchInfo GerritBranchResponse
+	err = json.Unmarshal(bytes, &branchInfo)
+	if err != nil {
+		return errHandler("WMF Extension distributor infomation response decode failed. ", err)
+	}
+
+	return fmt.Sprintf("https://extdist.wmflabs.org/dist/%ss/%s-%s-%s.tar.gz", t, name, MWREL, branchInfo.Revision[0:7])
 }
 
 // Handle Download
