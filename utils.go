@@ -62,7 +62,7 @@ func readConfig(config_path string) (*RootConfig, error) {
 
 // Just make new DownloadOption
 func NewDownloadOptions(t string, name string, url string) DownloadOption {
-	return DownloadOption{Type: t, Name: name, Url: url}
+	return DownloadOption{Type: t, Name: name, Url: strings.ReplaceAll(url, "$mwrel", MWREL)}
 }
 
 // Parse config to make download options.
@@ -70,10 +70,6 @@ func parseConfigToUrls(config RootConfig) []DownloadOption {
 	var result []DownloadOption
 	a := func(t DownloadOption) {
 		result = append(result, t)
-	}
-
-	u := func(url string) string {
-		return strings.ReplaceAll(url, "$mwrel", MWREL)
 	}
 
 	for _, name := range config.Extensions.WMF {
@@ -87,7 +83,7 @@ func parseConfigToUrls(config RootConfig) []DownloadOption {
 	}
 
 	for name, url := range config.Extensions.Http {
-		a(NewDownloadOptions("extensions", name, u(url)))
+		a(NewDownloadOptions("extensions", name, url))
 		log.Debugf("Added Url Extension \"%s\" to download queue.", name)
 	}
 
@@ -102,7 +98,7 @@ func parseConfigToUrls(config RootConfig) []DownloadOption {
 	}
 
 	for name, url := range config.Skins.Http {
-		a(NewDownloadOptions("skins", name, u(url)))
+		a(NewDownloadOptions("skins", name, url))
 		log.Debugf("Added Url Skin \"%s\" to download queue.", name)
 	}
 
