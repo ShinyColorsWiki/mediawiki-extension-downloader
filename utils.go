@@ -169,7 +169,7 @@ func requestWMFExtDistUrl(t string, name string) string {
 		return errHandler("WMF Extension distributor infomation response decode failed. ", err)
 	}
 
-	return fmt.Sprintf("https://extdist.wmflabs.org/dist/%ss/%s-%s-%s.tar.gz", t, name, MWREL, branchInfo.Revision[0:7])
+	return fmt.Sprintf("https://extdist.wmflabs.org/dist/%ss/%s-%s-%s.tar.gz", t, name, MWREL, branchInfo.Revision[0:9])
 }
 
 // Handle Download
