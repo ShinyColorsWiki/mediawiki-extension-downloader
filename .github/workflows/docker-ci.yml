@@ -33,7 +33,7 @@ jobs:
           core.setOutput('date_version', `${year}${month}${day}${hour}${minute}${seconds}`);
 
     - name: Set up QEMU
-      uses: docker/setup-qemu-action@v2
+      uses: docker/setup-qemu-action@v3
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
