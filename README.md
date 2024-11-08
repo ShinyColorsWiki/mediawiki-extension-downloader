@@ -1,5 +1,5 @@
 # Mediawiki Extension Downloader
-(Will) used for our wiki extension downloader during image build.
+Used for our wiki extension downloader during image build.
 
 # Usage
 ```bash
@@ -12,9 +12,9 @@ Note: Environment variable `MWREL` has high priority than config's `MWREL` setti
 [`ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader`](https://ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader)
 
 # Limits/Known Issues
-* WMF extensions are downloaded using github. Will use Their GitLab once migrated all.
-* The `Git` actually doesn't use the git. Only supports GitHub and GitLab now.
-* This program will force to `strip-components=1`. This may has issue on `http` extensions. \
+* WMF extensions are downloaded via ExtDist with Gerrit. Maybe this will be changed future due to upstream.
+* The `Git` actually doesn't use the git. Only supports GitHub and GitLab now via download from the site itself.
+* This program will force to `strip-components=1`. This may has issue on `http` extensions.
 
 # Todo
 * Fix known issues.
