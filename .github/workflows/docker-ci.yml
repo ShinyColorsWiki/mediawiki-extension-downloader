@@ -15,7 +15,7 @@ jobs:
     if: github.actor != 'dependabot[bot]'
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     # this is a simple way of using date and time to do versioning.
     - name: Modify scripts and get version
