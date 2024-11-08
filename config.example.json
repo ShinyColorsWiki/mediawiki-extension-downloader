@@ -1,33 +1,28 @@
 {
-    "MWREL": "REL1_35",
-    "Extensions": {
-        "WMF": [
-            "CookieWarning",
-            "Math"
-        ],
-        "Git": {
-            "CrowdSec": {
-                "type": "github",
-                "repo": "ShinyColorsWiki/mediawiki-extension-crowdsec",
-                "branch": "master"
-            }
-        },
-        "http": {
-            "AWS": "https://github.com/edwardspec/mediawiki-aws-s3/archive/refs/heads/master.zip"
-        }
+  "MWREL": "REL1_43",
+  "Extensions": {
+    "WMF": ["CookieWarning", "Math"],
+    "Git": {
+      "CrowdSec": {
+        "type": "github",
+        "repo": "ShinyColorsWiki/mediawiki-extension-crowdsec",
+        "branch": "master"
+      }
     },
-    "Skins": {
-        "WMF": [
-            "MinervaNeue"
-        ],
-        "Git": {
-            "Timeless": {
-                "type": "github",
-                "repo": "wikimedia/mediawiki-skins-Timeless"
-            }
-        },
-        "http": {
-            "Vector": "https://github.com/wikimedia/Vector/archive/refs/heads/$mwrel.zip"
-        }
+    "http": {
+      "AWS": "https://github.com/edwardspec/mediawiki-aws-s3/archive/refs/heads/master.zip"
     }
+  },
+  "Skins": {
+    "WMF": ["MinervaNeue"],
+    "Git": {
+      "Timeless": {
+        "type": "github",
+        "repo": "wikimedia/mediawiki-skins-Timeless"
+      }
+    },
+    "http": {
+      "Vector": "https://github.com/wikimedia/Vector/archive/refs/heads/$mwrel.zip"
+    }
+  }
 }

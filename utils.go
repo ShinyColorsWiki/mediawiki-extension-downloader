@@ -9,7 +9,6 @@ import (
 	netUrl "net/url"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	"github.com/mholt/archiver/v3"
@@ -199,24 +198,28 @@ func downloadUrl(name string, url string) (string, error) {
 	}
 	defer out.Close()
 
-	l.Debugf("Finish download url \"%s\"", url)
+	l.Debugf("Finish download url \"%s\" to \"%s\"", url, filename)
 	return filename, nil
 }
 
 // Try to detect extension for extract.
 func tryDetectExt(url string) string {
+	// Parse the URL for consistent behavior across platforms
 	u, err := netUrl.Parse(url)
-	if err != nil {
-		ext := path.Ext(filepath.Base(url))
-		if strings.HasSuffix(url, ".tar"+ext) {
-			return ".tar" + ext
-		}
-		return ext
+	if err != nil || u.Path == "" {
+		// Fallback to extracting directly from the raw URL if parsing fails
+		u.Path = url
 	}
-	ext := path.Ext(u.Path)
-	if strings.HasSuffix(url, ".tar"+ext) {
+
+	// Extract the base and extension manually
+	base := path.Base(u.Path)
+	ext := path.Ext(base)
+
+	// Special handling for extensions like ".tar.gz" or ".tar.bz2"
+	if strings.HasSuffix(base, ".tar"+ext) {
 		return ".tar" + ext
 	}
+
 	return ext
 }
 
