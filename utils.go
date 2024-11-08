@@ -147,7 +147,8 @@ func requestWMFExtDistUrl(t string, name string) string {
 		return fmt.Sprintf("https://github.com/wikimedia/mediawiki-%ss-%s/archive/%s.tar.gz", t, name, MWREL)
 	}
 
-	// FIXME: Use gitlab when they moved.
+	// FIXME: Use something else if they moved to another place.
+	// See: https://www.mediawiki.org/wiki/GitLab/Migration_status
 	branchInfoUrl := fmt.Sprintf("https://gerrit.wikimedia.org/r/projects/mediawiki%%2F%ss%%2F%s/branches/%s", t, name, MWREL)
 	resp, err := http.Get(branchInfoUrl)
 	if err != nil {

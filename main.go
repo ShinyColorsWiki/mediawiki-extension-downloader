@@ -36,6 +36,7 @@ func main() {
 	force_rm_target := flag.Bool("force-rm-target", false, "Turn this on to delete target directory if exist. Be careful to use!")
 	retry_count := flag.Int("retry-count", 3, "Number of retries for download and extraction process.")
 	retry_delay := flag.Int("retry-delay", 2, "Delay in seconds between retries for download and extraction process.")
+	no_fatal_on_error := flag.Bool("no-fatal-on-error", false, "Do not exit with fatal error if an error occurs during download.")
 	flag.Parse()
 
 	// Set flags to each variables.
@@ -92,7 +93,12 @@ func main() {
 	// Downloader.
 	var wg sync.WaitGroup
 	DownloadTargets := parseConfigToUrls(*config)
-	wg.Add(len(DownloadTargets))
+	lenDownloadTargets := len(DownloadTargets)
+
+	// Start download process
+	log.Infof("Start download process for %d targets", lenDownloadTargets)
+
+	wg.Add(lenDownloadTargets)
 	for _, opts := range DownloadTargets {
 		log.Debugf("Start download %s \"%s\"", opts.Type, opts.Name)
 		go opts.StartDownload(&wg, *retry_count, time.Duration(*retry_delay)*time.Second)
@@ -105,7 +111,12 @@ func main() {
 
 	// Finish notify
 	if hasError {
-		log.Info("Error has occured during download. Please check the logs.")
+		msg := "Error has occured during download. Please check the logs."
+		if *no_fatal_on_error {
+			log.Error(msg)
+		} else {
+			log.Fatal(msg)
+		}
 	}
 	log.Info("Download Finished.")
 }
@@ -114,8 +125,7 @@ func (o DownloadOption) StartDownload(wg *sync.WaitGroup, retryCount int, retryD
 	defer wg.Done()
 
 	err := retry(func() error {
-		// remove "s" suffix
-		log.Info(o.Type)
+		// remove "s" suffix from type for target name
 		targetName := o.Type[:len(o.Type)-1]
 
 		// Step 1: Download file from URL
