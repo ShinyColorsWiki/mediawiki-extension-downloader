@@ -11,7 +11,7 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
       - uses: actions/checkout@v4
       - run: go test
 
@@ -20,7 +20,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v4
+      - uses: actions/setup-go@v5
       - uses: actions/checkout@v4
       - run: go build
       - run: ./mediawiki-extension-downloader --help
