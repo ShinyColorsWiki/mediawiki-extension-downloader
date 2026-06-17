@@ -33,6 +33,7 @@ type GitConfig struct {
 	Type    string `json:"type"`
 	Repo    string `json:"repo,omitempty"`
 	Branch  string `json:"branch,omitempty"`
+	Tag     string `json:"tag,omitempty"`
 	RepoUrl string `json:"repoUrl,omitempty"`
 }
 
@@ -108,20 +109,49 @@ func parseConfigToUrls(config RootConfig) []DownloadOption {
 func (s GitConfig) MakeGitUrl() string {
 	// TODO: Direct Git Download for not-defacto git sites like self-hosted git solutions.
 	// No direct git download when using url builder.
-
-	// Choose default branch
-	if s.Branch == "" {
-		s.Branch = MWREL
-	}
+	refType, ref := s.archiveRef()
 
 	switch s.Type {
 	case "github":
-		return fmt.Sprintf("https://github.com/%s/archive/%s.tar.gz", s.Repo, s.Branch)
+		return fmt.Sprintf(
+			"https://github.com/%s/archive/refs/%s/%s.tar.gz",
+			escapeUrlPathPreservingSlashes(s.Repo),
+			refType,
+			escapeUrlPathPreservingSlashes(ref),
+		)
 	case "gitlab":
-		return fmt.Sprintf("https://gitlab.com/%s/-/archive/%s.tar.gz", s.Repo, s.Branch) // TODO: Is this really works well?
+		query := netUrl.Values{}
+		query.Set("sha", fmt.Sprintf("refs/%s/%s", refType, ref))
+
+		return fmt.Sprintf(
+			"https://gitlab.com/api/v4/projects/%s/repository/archive.tar.gz?%s",
+			netUrl.PathEscape(s.Repo),
+			query.Encode(),
+		)
 	default:
 		return ""
 	}
+}
+
+func (s GitConfig) archiveRef() (string, string) {
+	if s.Tag != "" {
+		return "tags", strings.ReplaceAll(s.Tag, "$mwrel", MWREL)
+	}
+
+	branch := s.Branch
+	if branch == "" {
+		branch = MWREL
+	}
+
+	return "heads", strings.ReplaceAll(branch, "$mwrel", MWREL)
+}
+
+func escapeUrlPathPreservingSlashes(value string) string {
+	parts := strings.Split(value, "/")
+	for i, part := range parts {
+		parts[i] = netUrl.PathEscape(part)
+	}
+	return strings.Join(parts, "/")
 }
 
 // Make WMF Extension Download Url.

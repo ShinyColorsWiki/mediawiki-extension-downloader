@@ -8,6 +8,27 @@ $ mediawiki-extension-downloader --config ./config.json --target ./extension --f
 See `config.example.json` to how to configure. \
 Note: Environment variable `MWREL` has high priority than config's `MWREL` settings.
 
+For `Git` entries, set either `branch` or `tag`. If neither is set, the downloader uses `MWREL` as the branch.
+
+```json
+{
+  "Extensions": {
+    "Git": {
+      "ExampleFromBranch": {
+        "type": "github",
+        "repo": "example/mediawiki-extension-example",
+        "branch": "REL1_43"
+      },
+      "ExampleFromTag": {
+        "type": "github",
+        "repo": "example/mediawiki-extension-example",
+        "tag": "v1.2.3"
+      }
+    }
+  }
+}
+```
+
 # Docker
 [`ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader`](https://ghcr.io/ShinyColorsWiki/mediawiki-extension-downloader)
 
