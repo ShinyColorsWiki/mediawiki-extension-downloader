@@ -40,7 +40,7 @@ jobs:
 
     - name: Login to GitHub Container Registry
       uses: docker/login-action@v3
-      if: ${{ github.repository_owner == 'ShinyColorsWiki' && github.ref == 'refs/heads/master' }}
+      if: ${{ github.repository_owner == 'ShinyColorsWiki' && github.event_name != 'pull_request' }}
       with:
         registry: ghcr.io
         username: ${{ github.repository_owner }}
@@ -48,7 +48,7 @@ jobs:
 
     - name: Login to Quay.io Container Registry
       uses: docker/login-action@v3
-      if: ${{ github.repository_owner == 'ShinyColorsWiki' && github.ref == 'refs/heads/master' }}
+      if: ${{ github.repository_owner == 'ShinyColorsWiki' && github.event_name != 'pull_request' }}
       with:
         registry: quay.io
         username: ${{ secrets.QUAY_USERNAME }}
@@ -60,13 +60,13 @@ jobs:
         context: ./
         file: ./Dockerfile
         platforms: linux/amd64, linux/arm64
-        push: ${{ github.repository_owner == 'ShinyColorsWiki' && github.ref == 'refs/heads/master' }}
+        push: ${{ github.repository_owner == 'ShinyColorsWiki' && github.event_name != 'pull_request' }}
         tags: |
-          ghcr.io/shinycolorswiki/mediawiki-extension-downloader:latest
           ghcr.io/shinycolorswiki/mediawiki-extension-downloader:${{ github.sha }}
-          ghcr.io/shinycolorswiki/mediawiki-extension-downloader:${{ steps.version.outputs.date_version }}
-          quay.io/shinycolorswiki/mediawiki-extension-downloader:latest
           quay.io/shinycolorswiki/mediawiki-extension-downloader:${{ github.sha }}
+          ${{ github.ref == 'refs/heads/master' && 'ghcr.io/shinycolorswiki/mediawiki-extension-downloader:latest' || '' }}
+          ${{ github.ref == 'refs/heads/master' && 'quay.io/shinycolorswiki/mediawiki-extension-downloader:latest' || '' }}
+          ghcr.io/shinycolorswiki/mediawiki-extension-downloader:${{ steps.version.outputs.date_version }}
           quay.io/shinycolorswiki/mediawiki-extension-downloader:${{ steps.version.outputs.date_version }}
         cache-from: type=gha,scope=${{ github.workflow }}
         cache-to: type=gha,mode=max,scope=${{ github.workflow }}

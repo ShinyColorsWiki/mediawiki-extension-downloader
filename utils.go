@@ -169,6 +169,25 @@ type GerritBranchResponse struct {
 	Revision string `json:"revision"`
 }
 
+const downloaderUserAgent = "mediawiki-extension-downloader/1.0 (https://github.com/ShinyColorsWiki/mediawiki-extension-downloader)"
+
+func getURL(url string) (*http.Response, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("User-Agent", downloaderUserAgent)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return nil, fmt.Errorf("GET %s: HTTP %d (%s)", url, resp.StatusCode, resp.Status)
+	}
+	return resp, nil
+}
+
 // TODO: async-able.
 func requestWMFExtDistUrl(t string, name string) string {
 	errHandler := func(msg string, err error) string {
@@ -180,7 +199,7 @@ func requestWMFExtDistUrl(t string, name string) string {
 	// FIXME: Use something else if they moved to another place.
 	// See: https://www.mediawiki.org/wiki/GitLab/Migration_status
 	branchInfoUrl := fmt.Sprintf("https://gerrit.wikimedia.org/r/projects/mediawiki%%2F%ss%%2F%s/branches/%s", t, name, MWREL)
-	resp, err := http.Get(branchInfoUrl)
+	resp, err := getURL(branchInfoUrl)
 	if err != nil {
 		return errHandler("WMF Extension distributor infomation request failed. ", err)
 	}
@@ -192,11 +211,19 @@ func requestWMFExtDistUrl(t string, name string) string {
 		return errHandler("WMF Extension distributor infomation response read failed. ", err)
 	}
 
-	bytes = bytes[5 : len(bytes)-1]
+	const prefix = ")]}'\n"
+	if !strings.HasPrefix(string(bytes), prefix) {
+		return errHandler("WMF Extension distributor response invalid. ", fmt.Errorf("missing Gerrit JSON prefix"))
+	}
+	bytes = bytes[len(prefix):]
 	var branchInfo GerritBranchResponse
 	err = json.Unmarshal(bytes, &branchInfo)
 	if err != nil {
 		return errHandler("WMF Extension distributor infomation response decode failed. ", err)
+	}
+
+	if len(branchInfo.Revision) < 7 {
+		return errHandler("WMF Extension distributor revision invalid. ", fmt.Errorf("revision too short: %q", branchInfo.Revision))
 	}
 
 	return fmt.Sprintf("https://extdist.wmflabs.org/dist/%ss/%s-%s-%s.tar.gz", t, name, MWREL, branchInfo.Revision[0:7])
@@ -207,7 +234,7 @@ func downloadUrl(name string, url string) (string, error) {
 	l := log.Child("downloadUrl").Child(name)
 	l.Debugf("Start download url \"%s\"", url)
 
-	resp, err := http.Get(url)
+	resp, err := getURL(url)
 	if err != nil {
 		l.Error(fmt.Sprintf("Failed to download url \"%s\"", url), err)
 		return "", err
