@@ -14,7 +14,7 @@ jobs:
       - name: Checkout the repository
         uses: actions/checkout@v7.0.1
       - name: Generate build files
-        uses: thatisuday/go-build-action@v1.0.2
+        uses: thatisuday/go-build-action@v1.1.0
         with:
           platforms: "linux/amd64, linux/arm, linux/arm64"
           name: "mediawiki-extension-downloader"
